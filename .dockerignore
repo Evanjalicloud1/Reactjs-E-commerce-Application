@@ -1,0 +1,9 @@
+# Ignore everything not needed for build
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+*.md
+node_modules
+*.log
+*.out
