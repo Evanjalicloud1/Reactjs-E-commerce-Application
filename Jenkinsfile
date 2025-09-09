@@ -1,9 +1,3 @@
-// Jenkinsfile - Multibranch Pipeline for React Ecom
-// Required Jenkins credentials (IDs):
-// - dockerhub-creds   : Docker Hub username/password
-// - github-ssh-key    : GitHub SSH private key (for cloning) — configured in Branch Source
-// - ec2-ssh-key       : EC2 SSH private key (for deployment)
-
 pipeline {
   agent any
 
@@ -12,10 +6,11 @@ pipeline {
     DOCKERHUB_USER = 'evanjali1468'
     DEV_REPO = "${DOCKERHUB_USER}/dev"
     PROD_REPO = "${DOCKERHUB_USER}/prod"
-    DEPLOY_USER = 'ubuntu'              // change to ec2-user if using Amazon Linux
-    DEPLOY_HOST = '13.201.92.185'       // your EC2 Public IP
+    DEPLOY_USER = 'ubuntu'
+    DEPLOY_HOST = '13.201.92.185'      // <-- change to your Elastic IP if different
     DEPLOY_SSH_CRED = 'ec2-ssh-key'
     APP_CONTAINER_NAME = 'react-ecom'
+    TAG = 'latest'
   }
 
   stages {
@@ -29,8 +24,7 @@ pipeline {
     stage('Determine Image') {
       steps {
         script {
-          BR = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'dev'
-          TAG = "latest"
+          BR = env.BRANCH_NAME ?: 'dev'
           if (BR ==~ /(?i)main|master/) {
             IMAGE = "${PROD_REPO}:${TAG}"
           } else {
@@ -43,43 +37,44 @@ pipeline {
 
     stage('Build Docker Image') {
       steps {
+        // ensure docker is available in the agent/container
         sh "docker build -t ${IMAGE} ."
       }
     }
 
     stage('Push to Docker Hub') {
       steps {
-        withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CRED}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+        withCredentials([usernamePassword(credentialsId: env.DOCKERHUB_CRED, usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
           sh '''
             echo "$DH_PASS" | docker login --username "$DH_USER" --password-stdin
-          '''
-          sh "docker push ${IMAGE}"
+            docker push ${IMAGE}
+          '''.stripIndent()
         }
       }
     }
 
-    stage('Deploy to EC2 (only on main)') {
+    stage('Deploy to EC2 (main only)') {
       when {
-        anyOf {
-          branch 'main'
-          branch 'master'
-        }
+        anyOf { branch 'main'; branch 'master' }
       }
       steps {
-        sshagent (credentials: ["${DEPLOY_SSH_CRED}"]) {
-          sh "scp -o StrictHostKeyChecking=no deploy.sh ${DEPLOY_USER}@${DEPLOY_HOST}:~/deploy.sh"
-          sh "ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} 'chmod +x ~/deploy.sh && ~/deploy.sh ${IMAGE} ${APP_CONTAINER_NAME}'"
+        // this uses sshUserPrivateKey to create a temporary key file available as $SSH_KEYFILE
+        withCredentials([sshUserPrivateKey(credentialsId: env.DEPLOY_SSH_CRED, keyFileVariable: 'SSH_KEYFILE', usernameVariable: 'SSH_USER')]) {
+          sh """
+            chmod +x ./deploy.sh
+            # copy deploy script
+            scp -o StrictHostKeyChecking=no -i \$SSH_KEYFILE ./deploy.sh ${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/deploy.sh
+            # run deploy script remotely passing image & container name
+            ssh -o StrictHostKeyChecking=no -i \$SSH_KEYFILE ${DEPLOY_USER}@${DEPLOY_HOST} 'bash -xe /tmp/deploy.sh ${IMAGE} ${APP_CONTAINER_NAME}'
+          """.stripIndent()
         }
       }
     }
   }
 
   post {
-    success {
-      echo "✅ Pipeline succeeded for branch ${BR}"
-    }
-    failure {
-      echo "❌ Pipeline failed for branch ${BR}"
-    }
+    success { echo "✅ Pipeline succeeded for branch ${BR}" }
+    failure { echo "❌ Pipeline failed for branch ${BR}" }
   }
 }
+
