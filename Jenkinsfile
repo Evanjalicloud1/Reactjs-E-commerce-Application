@@ -69,10 +69,10 @@ pipeline {
 
   post {
     success {
-      echo "✅ Pipeline succeeded for branch ${env.BR} and image ${env.IMAGE}"
+      echo "Pipeline succeeded for branch ${env.BR} and image ${env.IMAGE}"
     }
     failure {
-      echo "❌ Pipeline failed for branch ${env.BR} and image ${env.IMAGE}"
+      echo "Pipeline failed for branch ${env.BR} and image ${env.IMAGE}"
     }
   }
 }
