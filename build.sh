@@ -20,13 +20,13 @@ fi
 
 IMAGE="${REPO}:${TAG}"
 
-echo "🚀 Building Docker image ${IMAGE} ..."
+echo "Building Docker image ${IMAGE} ..."
 docker build -t "${IMAGE}" .
 
-echo "🔑 Logging into Docker Hub..."
+echo "Logging into Docker Hub..."
 docker login -u "${DOCKERHUB_USER}"
 
-echo "📤 Pushing ${IMAGE} ..."
+echo "Pushing ${IMAGE} ..."
 docker push "${IMAGE}"
 
-echo "✅ Done: ${IMAGE}"
+echo "Done: ${IMAGE}"
