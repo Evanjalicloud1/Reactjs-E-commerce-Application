@@ -131,5 +131,7 @@ evanjali1468/dev:latest (Public)
 
 evanjali1468/prod:latest (Private)
 
+I have added all the screenshots in the word document.
+
 With these steps, I have deployed the given ReactJS application in a production-ready state with Docker, Jenkins, AWS, and monitoring.
    
